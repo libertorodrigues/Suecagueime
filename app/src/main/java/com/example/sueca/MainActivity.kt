@@ -252,51 +252,25 @@ private fun TableArea(
             modifier = Modifier
                 .fillMaxSize()
                 .background(TableBackground, RoundedCornerShape(24.dp))
-                .padding(12.dp),
+                .padding(10.dp),
         ) {
-            PlayerBadge(
-                name = "Parceiro",
-                handSize = state.playerHands[2].size,
-                isCurrent = state.currentPlayer == 2,
-                modifier = Modifier.align(Alignment.TopCenter),
-            )
-            PlayerBadge(
-                name = "Esquerda",
-                handSize = state.playerHands[1].size,
-                isCurrent = state.currentPlayer == 1,
-                modifier = Modifier.align(Alignment.CenterStart),
-            )
-            PlayerBadge(
-                name = "Direita",
-                handSize = state.playerHands[3].size,
-                isCurrent = state.currentPlayer == 3,
-                modifier = Modifier.align(Alignment.CenterEnd),
-            )
-            PlayerBadge(
-                name = "Tu",
-                handSize = state.playerHands[0].size,
-                isCurrent = state.currentPlayer == 0,
-                modifier = Modifier.align(Alignment.BottomCenter),
-            )
-
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .fillMaxWidth(0.86f)
-                    .fillMaxHeight(0.84f)
+                    .fillMaxSize()
                     .background(Color(0xFF2E7D32), RoundedCornerShape(26.dp)),
             ) {
                 playedCards[2]?.let {
-                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp))
+                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp))
                 }
                 playedCards[1]?.let {
-                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.CenterStart).padding(start = 18.dp))
+                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.CenterStart).padding(start = 10.dp))
                 }
                 playedCards[3]?.let {
-                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 18.dp))
+                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.CenterEnd).padding(end = 10.dp))
                 }
                 playedCards[0]?.let {
-                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
+                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 10.dp))
                 }
                 if (state.isCollectingTrick) {
                     Button(
@@ -307,30 +281,6 @@ private fun TableArea(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PlayerBadge(
-    name: String,
-    handSize: Int,
-    isCurrent: Boolean,
-    modifier: Modifier = Modifier,
-) {
-    MaterialCard(
-        modifier = modifier.widthIn(min = 84.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isCurrent) AccentGold else Color.White.copy(alpha = 0.94f),
-        ),
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Text(text = name, color = PrimaryText, fontWeight = FontWeight.Bold)
-            Text(text = "$handSize cartas", color = SecondaryText, fontSize = 12.sp)
         }
     }
 }
@@ -349,7 +299,6 @@ private fun TrickSeatCard(order: Int, playedCard: PlayedCard, modifier: Modifier
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text(text = seatName(playedCard.playerIndex), color = PrimaryText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text(
                     text = playedCard.card.displayName,
                     style = MaterialTheme.typography.titleLarge,
