@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -275,9 +276,12 @@ private fun TableArea(
                 if (state.isCollectingTrick) {
                     Button(
                         onClick = onCollectTrick,
-                        modifier = Modifier.align(Alignment.Center),
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .widthIn(min = 0.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                     ) {
-                        Text("Recolher cartas")
+                        Text("Recolher", fontSize = 12.sp)
                     }
                 }
             }

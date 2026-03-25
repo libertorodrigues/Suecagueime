@@ -94,14 +94,23 @@ class SuecaGameEngine(
     }
 
     fun playHumanCard(state: SuecaUiState, card: Card): SuecaUiState {
-        if (state.screen != AppScreen.GAME || state.isRoundFinished || state.isMatchFinished || state.isCollectingTrick) return state
+        if (state.screen != AppScreen.GAME || state.isRoundFinished || state.isMatchFinished) return state
         if (state.currentPlayer != 0) return state
 
-        val hand = state.playerHands[0]
-        if (card !in hand) return state
-        if (!canPlayCard(hand, state.currentTrick.firstOrNull()?.card?.suit, card)) return state
+        val readyState = if (state.isCollectingTrick) {
+            state.copy(
+                completedTrickCards = emptyList(),
+                isCollectingTrick = false,
+            )
+        } else {
+            state
+        }
 
-        var updatedState = playCard(state, 0, card)
+        val hand = readyState.playerHands[0]
+        if (card !in hand) return state
+        if (!canPlayCard(hand, readyState.currentTrick.firstOrNull()?.card?.suit, card)) return state
+
+        var updatedState = playCard(readyState, 0, card)
         updatedState = resolveBotTurns(updatedState)
         return updatedState
     }
