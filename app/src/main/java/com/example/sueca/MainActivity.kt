@@ -140,7 +140,7 @@ private fun GameScreen(
         TopScoreboard(state)
         TableArea(
             state = state,
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(if (state.isRoundFinished || state.isMatchFinished) 1f else 1.3f),
         )
         RoundInfoBar(state)
         HumanHand(
@@ -148,7 +148,9 @@ private fun GameScreen(
             legalCards = legalCards,
             onPlayCard = onPlayCard,
         )
-        ActionArea(state = state, onNextRound = onNextRound, onRestart = onRestart)
+        if (state.isRoundFinished || state.isMatchFinished) {
+            ActionArea(state = state, onNextRound = onNextRound, onRestart = onRestart)
+        }
     }
 }
 
@@ -263,19 +265,12 @@ private fun TableArea(state: SuecaUiState, modifier: Modifier = Modifier) {
             Box(
                 modifier = Modifier
                     .align(Alignment.Center)
-                    .fillMaxWidth(0.72f)
-                    .fillMaxHeight(0.72f)
+                    .fillMaxWidth(0.86f)
+                    .fillMaxHeight(0.84f)
                     .background(Color(0xFF2E7D32), RoundedCornerShape(26.dp)),
             ) {
-                Text(
-                    text = "Mesa",
-                    color = Color.White.copy(alpha = 0.85f),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
-                )
-
                 playedCards[2]?.let {
-                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.TopCenter).padding(top = 42.dp))
+                    TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp))
                 }
                 playedCards[1]?.let {
                     TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.CenterStart).padding(start = 18.dp))
@@ -287,15 +282,29 @@ private fun TableArea(state: SuecaUiState, modifier: Modifier = Modifier) {
                     TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
                 }
 
-                if (playedCards.isEmpty()) {
-                    Text(
-                        text = "As cartas jogadas aparecem aqui pela ordem da vaza.",
-                        color = Color.White,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .align(Alignment.Center)
-                            .padding(horizontal = 24.dp),
-                    )
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.Center,
+                ) {
+                    if (state.currentTrick.isEmpty()) {
+                        Text(
+                            text = "A jogada aparecerá aqui por ordem.",
+                            color = Color.White.copy(alpha = 0.9f),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp),
+                        )
+                    } else {
+                        state.currentTrick.forEachIndexed { index, playedCard ->
+                            TrickTimelineCard(
+                                playedCard = playedCard,
+                                order = index + 1,
+                                modifier = Modifier.padding(horizontal = 4.dp),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -358,6 +367,35 @@ private fun TrickSeatCard(order: Int, playedCard: PlayedCard, modifier: Modifier
             contentAlignment = Alignment.Center,
         ) {
             Text(text = order.toString(), color = PrimaryText, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+        }
+    }
+}
+
+@Composable
+private fun TrickTimelineCard(
+    playedCard: PlayedCard,
+    order: Int,
+    modifier: Modifier = Modifier,
+) {
+    MaterialCard(
+        modifier = modifier,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBF2)),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(text = "${order}º", color = SecondaryText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(
+                text = playedCard.card.displayName,
+                color = suitColor(playedCard.card.suit),
+                fontWeight = FontWeight.ExtraBold,
+                fontSize = 14.sp,
+            )
+            Text(text = seatName(playedCard.playerIndex), color = SecondaryText, fontSize = 10.sp)
         }
     }
 }
