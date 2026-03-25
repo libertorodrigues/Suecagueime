@@ -28,10 +28,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -82,6 +84,7 @@ fun SuecaApp() {
         AppScreen.GAME -> GameScreen(
             state = state,
             onPlayCard = { card -> state = engine.playHumanCard(state, card) },
+            onCollectTrick = { state = engine.collectTrick(state) },
             onNextRound = { state = engine.nextRound(state) },
             onRestart = { state = engine.startMatch() },
         )
@@ -123,9 +126,17 @@ private fun MainMenu(onPlayBots: () -> Unit) {
 private fun GameScreen(
     state: SuecaUiState,
     onPlayCard: (GameCard) -> Unit,
+    onCollectTrick: () -> Unit,
     onNextRound: () -> Unit,
     onRestart: () -> Unit,
 ) {
+    LaunchedEffect(state.isCollectingTrick, state.completedTricks) {
+        if (state.isCollectingTrick) {
+            delay(10_000)
+            onCollectTrick()
+        }
+    }
+
     val legalCards = remember(state.playerHands, state.currentTrick) {
         SuecaGameEngine().legalCards(state.playerHands[0], state.currentTrick.firstOrNull()?.card?.suit)
     }
@@ -140,6 +151,7 @@ private fun GameScreen(
         TopScoreboard(state)
         TableArea(
             state = state,
+            onCollectTrick = onCollectTrick,
             modifier = Modifier.weight(if (state.isRoundFinished || state.isMatchFinished) 1f else 1.3f),
         )
         RoundInfoBar(state)
@@ -226,9 +238,14 @@ private fun TeamPointsCard(
 }
 
 @Composable
-private fun TableArea(state: SuecaUiState, modifier: Modifier = Modifier) {
-    val playedCards = state.currentTrick.associateBy { it.playerIndex }
-    val playOrder = state.currentTrick.mapIndexed { index, playedCard -> playedCard.playerIndex to (index + 1) }.toMap()
+private fun TableArea(
+    state: SuecaUiState,
+    onCollectTrick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val trickCards = if (state.currentTrick.isNotEmpty()) state.currentTrick else state.completedTrickCards
+    val playedCards = trickCards.associateBy { it.playerIndex }
+    val playOrder = trickCards.mapIndexed { index, playedCard -> playedCard.playerIndex to (index + 1) }.toMap()
 
     InfoPanel(modifier = modifier.fillMaxWidth()) {
         Box(
@@ -281,29 +298,12 @@ private fun TableArea(state: SuecaUiState, modifier: Modifier = Modifier) {
                 playedCards[0]?.let {
                     TrickSeatCard(order = playOrder[it.playerIndex] ?: 0, playedCard = it, modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 18.dp))
                 }
-
-                Row(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp),
-                    horizontalArrangement = Arrangement.Center,
-                ) {
-                    if (state.currentTrick.isEmpty()) {
-                        Text(
-                            text = "A jogada aparecerá aqui por ordem.",
-                            color = Color.White.copy(alpha = 0.9f),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 24.dp),
-                        )
-                    } else {
-                        state.currentTrick.forEachIndexed { index, playedCard ->
-                            TrickTimelineCard(
-                                playedCard = playedCard,
-                                order = index + 1,
-                                modifier = Modifier.padding(horizontal = 4.dp),
-                            )
-                        }
+                if (state.isCollectingTrick) {
+                    Button(
+                        onClick = onCollectTrick,
+                        modifier = Modifier.align(Alignment.Center),
+                    ) {
+                        Text("Recolher cartas")
                     }
                 }
             }
@@ -367,35 +367,6 @@ private fun TrickSeatCard(order: Int, playedCard: PlayedCard, modifier: Modifier
             contentAlignment = Alignment.Center,
         ) {
             Text(text = order.toString(), color = PrimaryText, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-        }
-    }
-}
-
-@Composable
-private fun TrickTimelineCard(
-    playedCard: PlayedCard,
-    order: Int,
-    modifier: Modifier = Modifier,
-) {
-    MaterialCard(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFBF2)),
-        shape = RoundedCornerShape(14.dp),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.6f)),
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp),
-        ) {
-            Text(text = "${order}º", color = SecondaryText, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-            Text(
-                text = playedCard.card.displayName,
-                color = suitColor(playedCard.card.suit),
-                fontWeight = FontWeight.ExtraBold,
-                fontSize = 14.sp,
-            )
-            Text(text = seatName(playedCard.playerIndex), color = SecondaryText, fontSize = 10.sp)
         }
     }
 }

@@ -57,6 +57,8 @@ data class SuecaUiState(
     val screen: AppScreen = AppScreen.MENU,
     val playerHands: List<List<Card>> = List(4) { emptyList() },
     val currentTrick: List<PlayedCard> = emptyList(),
+    val completedTrickCards: List<PlayedCard> = emptyList(),
+    val isCollectingTrick: Boolean = false,
     val completedTricks: Int = 0,
     val currentPlayer: Int = 0,
     val startingPlayer: Int = 0,
@@ -90,7 +92,7 @@ class SuecaGameEngine(
     }
 
     fun playHumanCard(state: SuecaUiState, card: Card): SuecaUiState {
-        if (state.screen != AppScreen.GAME || state.isRoundFinished || state.isMatchFinished) return state
+        if (state.screen != AppScreen.GAME || state.isRoundFinished || state.isMatchFinished || state.isCollectingTrick) return state
         if (state.currentPlayer != 0) return state
 
         val hand = state.playerHands[0]
@@ -107,6 +109,15 @@ class SuecaGameEngine(
         trumpHolder = (trumpHolder + 1) % 4
         roundNumber += 1
         return startRound()
+    }
+
+    fun collectTrick(state: SuecaUiState): SuecaUiState {
+        if (!state.isCollectingTrick || state.isRoundFinished || state.isMatchFinished) return state
+        val collectedState = state.copy(
+            completedTrickCards = emptyList(),
+            isCollectingTrick = false,
+        )
+        return resolveBotTurns(collectedState)
     }
 
     private fun startRound(): SuecaUiState {
@@ -135,7 +146,12 @@ class SuecaGameEngine(
 
     private fun resolveBotTurns(state: SuecaUiState): SuecaUiState {
         var currentState = state
-        while (!currentState.isRoundFinished && !currentState.isMatchFinished && currentState.currentPlayer != 0) {
+        while (
+            !currentState.isRoundFinished &&
+            !currentState.isMatchFinished &&
+            !currentState.isCollectingTrick &&
+            currentState.currentPlayer != 0
+        ) {
             val player = currentState.currentPlayer
             val hand = currentState.playerHands[player]
             val leadingSuit = currentState.currentTrick.firstOrNull()?.card?.suit
@@ -187,6 +203,8 @@ class SuecaGameEngine(
             }
             return state.copy(
                 currentTrick = emptyList(),
+                completedTrickCards = state.currentTrick,
+                isCollectingTrick = true,
                 completedTricks = tricksCompleted,
                 currentPlayer = result.winnerIndex,
                 trickLeader = result.winnerIndex,
@@ -202,6 +220,8 @@ class SuecaGameEngine(
 
         return state.copy(
             currentTrick = emptyList(),
+            completedTrickCards = state.currentTrick,
+            isCollectingTrick = true,
             completedTricks = tricksCompleted,
             currentPlayer = result.winnerIndex,
             trickLeader = result.winnerIndex,
