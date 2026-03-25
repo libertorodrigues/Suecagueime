@@ -11,20 +11,21 @@ enum class Suit(val label: String, val shortName: String) {
 
 enum class Rank(
     val label: String,
+    val fullName: String,
     val displayValue: Int,
     val trickStrength: Int,
     val points: Int,
 ) {
-    TWO("2", 2, 1, 0),
-    THREE("3", 3, 2, 0),
-    FOUR("4", 4, 3, 0),
-    FIVE("5", 5, 4, 0),
-    SIX("6", 6, 5, 0),
-    QUEEN("D", 7, 8, 2),
-    JACK("J", 8, 9, 3),
-    KING("K", 9, 10, 4),
-    SEVEN("7", 10, 11, 10),
-    ACE("A", 11, 12, 11),
+    TWO("2", "dois", 2, 1, 0),
+    THREE("3", "três", 3, 2, 0),
+    FOUR("4", "quatro", 4, 3, 0),
+    FIVE("5", "cinco", 5, 4, 0),
+    SIX("6", "seis", 6, 5, 0),
+    QUEEN("D", "dama", 7, 8, 2),
+    JACK("J", "valete", 8, 9, 3),
+    KING("K", "rei", 9, 10, 4),
+    SEVEN("7", "sete", 10, 11, 10),
+    ACE("A", "ás", 11, 12, 11),
 }
 
 data class Card(val suit: Suit, val rank: Rank) {
@@ -63,6 +64,7 @@ data class SuecaUiState(
     val currentPlayer: Int = 0,
     val startingPlayer: Int = 0,
     val trumpHolder: Int = 0,
+    val trumpCard: Card? = null,
     val trumpSuit: Suit? = null,
     val trickLeader: Int = 0,
     val lastTrickWinner: Int? = null,
@@ -125,7 +127,8 @@ class SuecaGameEngine(
         val hands = List(4) { index ->
             deck.subList(index * 10, (index + 1) * 10).sortedWith(cardDisplayComparator())
         }
-        val trumpSuit = hands[trumpHolder].last().suit
+        val trumpCard = hands[trumpHolder].random(random)
+        val trumpSuit = trumpCard.suit
         val startingPlayer = trumpHolder
         var state = SuecaUiState(
             screen = AppScreen.GAME,
@@ -133,12 +136,13 @@ class SuecaGameEngine(
             currentPlayer = startingPlayer,
             startingPlayer = startingPlayer,
             trumpHolder = trumpHolder,
+            trumpCard = trumpCard,
             trumpSuit = trumpSuit,
             trickLeader = startingPlayer,
             roundScore = RoundScore(),
             matchScore = matchScore,
             roundNumber = roundNumber,
-            message = roundIntroMessage(trumpHolder, trumpSuit),
+            message = roundIntroMessage(trumpHolder, trumpCard),
         )
         state = resolveBotTurns(state)
         return state
@@ -155,15 +159,72 @@ class SuecaGameEngine(
             val player = currentState.currentPlayer
             val hand = currentState.playerHands[player]
             val leadingSuit = currentState.currentTrick.firstOrNull()?.card?.suit
-            val chosenCard = chooseBotCard(hand, leadingSuit)
+            val chosenCard = chooseBotCard(
+                hand = hand,
+                leadingSuit = leadingSuit,
+                currentTrick = currentState.currentTrick,
+                trumpSuit = currentState.trumpSuit ?: error("Trump required"),
+            )
             currentState = playCard(currentState, player, chosenCard)
         }
         return currentState
     }
 
-    private fun chooseBotCard(hand: List<Card>, leadingSuit: Suit?): Card {
+    private fun chooseBotCard(
+        hand: List<Card>,
+        leadingSuit: Suit?,
+        currentTrick: List<PlayedCard>,
+        trumpSuit: Suit,
+    ): Card {
         val legalCards = legalCards(hand, leadingSuit)
-        return legalCards.minWith(compareBy<Card>({ it.rank.trickStrength }, { it.suit.ordinal }))
+        if (leadingSuit == null) {
+            val nonTrumpCards = legalCards.filter { it.suit != trumpSuit }
+            return if (nonTrumpCards.isNotEmpty()) {
+                nonTrumpCards.maxWith(compareBy<Card>({ it.rank.points }, { it.rank.trickStrength }))
+            } else {
+                legalCards.minWith(compareBy<Card>({ it.rank.trickStrength }, { it.suit.ordinal }))
+            }
+        }
+
+        val strongestOnTable = currentTrick.maxWith(
+            compareBy<PlayedCard> {
+                when {
+                    it.card.suit == trumpSuit -> 2
+                    it.card.suit == leadingSuit -> 1
+                    else -> 0
+                }
+            }.thenBy { it.card.rank.trickStrength }
+        ).card
+
+        val winningOptions = legalCards.filter { candidate ->
+            isStrongerCard(
+                candidate = candidate,
+                currentWinner = strongestOnTable,
+                leadSuit = leadingSuit,
+                trumpSuit = trumpSuit,
+            )
+        }
+
+        return if (winningOptions.isNotEmpty()) {
+            winningOptions.minWith(compareBy<Card>({ it.rank.trickStrength }, { it.suit.ordinal }))
+        } else {
+            legalCards.minWith(compareBy<Card>({ it.rank.points }, { it.rank.trickStrength }, { it.suit.ordinal }))
+        }
+    }
+
+    private fun isStrongerCard(candidate: Card, currentWinner: Card, leadSuit: Suit, trumpSuit: Suit): Boolean {
+        val candidatePriority = cardPriority(candidate, leadSuit, trumpSuit)
+        val winnerPriority = cardPriority(currentWinner, leadSuit, trumpSuit)
+        return candidatePriority > winnerPriority ||
+            (candidatePriority == winnerPriority && candidate.rank.trickStrength > currentWinner.rank.trickStrength)
+    }
+
+    private fun cardPriority(card: Card, leadSuit: Suit, trumpSuit: Suit): Int {
+        return when {
+            card.suit == trumpSuit -> 2
+            card.suit == leadSuit -> 1
+            else -> 0
+        }
     }
 
     private fun playCard(state: SuecaUiState, playerIndex: Int, card: Card): SuecaUiState {
@@ -177,7 +238,7 @@ class SuecaGameEngine(
             playerHands = updatedHands,
             currentTrick = updatedTrick,
             currentPlayer = nextPlayer,
-            message = describePlay(playerIndex, card, state.trumpSuit),
+            message = describePlay(playerIndex, card, state.trumpCard),
         )
 
         if (updatedTrick.size == 4) {
@@ -241,10 +302,20 @@ class SuecaGameEngine(
 
     private fun updateMatchScore(matchScore: MatchScore, roundScore: RoundScore): MatchScore {
         return if (roundScore.teamPlayerPartner >= roundScore.teamOpponents) {
-            matchScore.copy(teamPlayerPartner = matchScore.teamPlayerPartner + 1)
+            matchScore.copy(
+                teamPlayerPartner = matchScore.teamPlayerPartner + gamesWonForPoints(roundScore.teamPlayerPartner),
+            )
         } else {
-            matchScore.copy(teamOpponents = matchScore.teamOpponents + 1)
+            matchScore.copy(
+                teamOpponents = matchScore.teamOpponents + gamesWonForPoints(roundScore.teamOpponents),
+            )
         }
+    }
+
+    private fun gamesWonForPoints(points: Int): Int = when {
+        points == 120 -> 4
+        points >= 91 -> 2
+        else -> 1
     }
 
     fun determineTrickWinner(cards: List<PlayedCard>, trumpSuit: Suit): TrickResult {
@@ -288,13 +359,13 @@ class SuecaGameEngine(
         else -> "Bot à direita"
     }
 
-    private fun describePlay(playerIndex: Int, card: Card, trumpSuit: Suit?): String {
-        val trumpText = trumpSuit?.let { " | Trunfo: ${it.label}" } ?: ""
+    private fun describePlay(playerIndex: Int, card: Card, trumpCard: Card?): String {
+        val trumpText = trumpCard?.let { " | Trunfo: ${it.textName()}" } ?: ""
         return "${playerName(playerIndex)} jogou ${card.displayName}$trumpText"
     }
 
-    private fun roundIntroMessage(trumpHolder: Int, trumpSuit: Suit): String {
-        return "Jogo $roundNumber: trunfo de ${playerName(trumpHolder)} em ${trumpSuit.label}."
+    private fun roundIntroMessage(trumpHolder: Int, trumpCard: Card): String {
+        return "Jogo $roundNumber: trunfo de ${playerName(trumpHolder)} é ${trumpCard.textName()}."
     }
 
     private fun roundEndMessage(
@@ -313,3 +384,5 @@ class SuecaGameEngine(
         return summary + matchSummary + winnerSummary
     }
 }
+
+private fun Card.textName(): String = "${rank.fullName} ${suit.label.lowercase()}"

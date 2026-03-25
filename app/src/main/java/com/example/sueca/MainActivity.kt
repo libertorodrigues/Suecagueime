@@ -331,7 +331,7 @@ private fun RoundInfoBar(state: SuecaUiState) {
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = "Trunfo: ${state.trumpSuit?.label ?: "-"} · Turno: ${seatName(state.currentPlayer)}",
+                    text = "Trunfo: ${formatTrumpCard(state.trumpCard)} · Turno: ${seatName(state.currentPlayer)}",
                     color = PrimaryText,
                     fontWeight = FontWeight.Bold,
                 )
@@ -521,6 +521,10 @@ private fun suitColor(suit: Suit): Color = when (suit) {
     Suit.HEARTS, Suit.DIAMONDS -> Color(0xFFB71C1C)
     Suit.CLUBS, Suit.SPADES -> Color(0xFF102A43)
 }
+
+private fun formatTrumpCard(card: GameCard?): String = card?.let {
+    "${it.rank.fullName} ${it.suit.label.lowercase()}"
+} ?: "-"
 
 @Preview(showBackground = true)
 @Composable
