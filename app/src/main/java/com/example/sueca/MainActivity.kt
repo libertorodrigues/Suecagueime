@@ -48,6 +48,7 @@ import com.example.sueca.game.PlayedCard
 import com.example.sueca.game.SuecaGameEngine
 import com.example.sueca.game.SuecaUiState
 import com.example.sueca.game.Suit
+import com.example.sueca.game.trumpDisplayName
 import com.example.sueca.ui.theme.SuecaTheme
 
 private val ScreenBackground = Color(0xFF123524)
@@ -382,7 +383,7 @@ private fun RoundInfoBar(state: SuecaUiState) {
         ) {
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(
-                    text = "Trunfo: ${state.trumpSuit?.label ?: "-"} · Turno: ${seatName(state.currentPlayer)}",
+                    text = "Trunfo: ${state.trumpCard?.trumpDisplayName() ?: "-"} · Turno: ${seatName(state.currentPlayer)}",
                     color = PrimaryText,
                     fontWeight = FontWeight.Bold,
                 )

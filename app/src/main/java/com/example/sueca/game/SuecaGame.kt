@@ -64,6 +64,7 @@ data class SuecaUiState(
     val startingPlayer: Int = 0,
     val trumpHolder: Int = 0,
     val trumpSuit: Suit? = null,
+    val trumpCard: Card? = null,
     val trickLeader: Int = 0,
     val lastTrickWinner: Int? = null,
     val roundScore: RoundScore = RoundScore(),
@@ -125,8 +126,9 @@ class SuecaGameEngine(
         val hands = List(4) { index ->
             deck.subList(index * 10, (index + 1) * 10).sortedWith(cardDisplayComparator())
         }
-        val trumpSuit = hands[trumpHolder].last().suit
         val startingPlayer = trumpHolder
+        val chosenTrumpCard = hands[startingPlayer].random(random)
+        val trumpSuit = chosenTrumpCard.suit
         var state = SuecaUiState(
             screen = AppScreen.GAME,
             playerHands = hands,
@@ -134,11 +136,12 @@ class SuecaGameEngine(
             startingPlayer = startingPlayer,
             trumpHolder = trumpHolder,
             trumpSuit = trumpSuit,
+            trumpCard = chosenTrumpCard,
             trickLeader = startingPlayer,
             roundScore = RoundScore(),
             matchScore = matchScore,
             roundNumber = roundNumber,
-            message = roundIntroMessage(trumpHolder, trumpSuit),
+            message = roundIntroMessage(startingPlayer, chosenTrumpCard),
         )
         state = resolveBotTurns(state)
         return state
@@ -153,17 +156,42 @@ class SuecaGameEngine(
             currentState.currentPlayer != 0
         ) {
             val player = currentState.currentPlayer
-            val hand = currentState.playerHands[player]
-            val leadingSuit = currentState.currentTrick.firstOrNull()?.card?.suit
-            val chosenCard = chooseBotCard(hand, leadingSuit)
+            val chosenCard = chooseBotCard(currentState, player)
             currentState = playCard(currentState, player, chosenCard)
         }
         return currentState
     }
 
-    private fun chooseBotCard(hand: List<Card>, leadingSuit: Suit?): Card {
+    private fun chooseBotCard(state: SuecaUiState, playerIndex: Int): Card {
+        val hand = state.playerHands[playerIndex]
+        val leadingSuit = state.currentTrick.firstOrNull()?.card?.suit
         val legalCards = legalCards(hand, leadingSuit)
-        return legalCards.minWith(compareBy<Card>({ it.rank.trickStrength }, { it.suit.ordinal }))
+        if (state.currentTrick.isEmpty()) {
+            val nonTrumpCards = legalCards.filter { it.suit != state.trumpSuit }
+            val leadOptions = if (nonTrumpCards.isNotEmpty()) nonTrumpCards else legalCards
+            return leadOptions.maxWith(compareBy<Card>({ it.rank.trickStrength }, { it.suit.ordinal }))
+        }
+
+        val trickSoFar = state.currentTrick
+        val trumpSuit = state.trumpSuit ?: return legalCards.first()
+        val currentWinner = determineTrickWinner(trickSoFar, trumpSuit).winnerIndex
+        val partnerWinning = currentWinner % 2 == playerIndex % 2
+        if (partnerWinning) {
+            return legalCards.minWith(compareBy<Card>({ it.rank.trickStrength }, { it.suit.ordinal }))
+        }
+
+        val winningCards = legalCards.filter { candidate ->
+            val candidateWinner = determineTrickWinner(
+                trickSoFar + PlayedCard(playerIndex, candidate),
+                trumpSuit,
+            ).winnerIndex
+            candidateWinner == playerIndex
+        }
+        return if (winningCards.isNotEmpty()) {
+            winningCards.minWith(compareBy<Card>({ it.rank.trickStrength }, { it.suit.ordinal }))
+        } else {
+            legalCards.minWith(compareBy<Card>({ it.rank.trickStrength }, { it.suit.ordinal }))
+        }
     }
 
     private fun playCard(state: SuecaUiState, playerIndex: Int, card: Card): SuecaUiState {
@@ -240,10 +268,13 @@ class SuecaGameEngine(
     }
 
     private fun updateMatchScore(matchScore: MatchScore, roundScore: RoundScore): MatchScore {
-        return if (roundScore.teamPlayerPartner >= roundScore.teamOpponents) {
-            matchScore.copy(teamPlayerPartner = matchScore.teamPlayerPartner + 1)
+        val playerTeamWon = roundScore.teamPlayerPartner >= roundScore.teamOpponents
+        val winnerPoints = if (playerTeamWon) roundScore.teamPlayerPartner else roundScore.teamOpponents
+        val roundWins = roundWinsForPoints(winnerPoints)
+        return if (playerTeamWon) {
+            matchScore.copy(teamPlayerPartner = matchScore.teamPlayerPartner + roundWins)
         } else {
-            matchScore.copy(teamOpponents = matchScore.teamOpponents + 1)
+            matchScore.copy(teamOpponents = matchScore.teamOpponents + roundWins)
         }
     }
 
@@ -293,8 +324,8 @@ class SuecaGameEngine(
         return "${playerName(playerIndex)} jogou ${card.displayName}$trumpText"
     }
 
-    private fun roundIntroMessage(trumpHolder: Int, trumpSuit: Suit): String {
-        return "Jogo $roundNumber: trunfo de ${playerName(trumpHolder)} em ${trumpSuit.label}."
+    private fun roundIntroMessage(trumpHolder: Int, trumpCard: Card): String {
+        return "Jogo $roundNumber: ${playerName(trumpHolder)} definiu trunfo em ${trumpCard.trumpDisplayName()}."
     }
 
     private fun roundEndMessage(
@@ -312,4 +343,26 @@ class SuecaGameEngine(
         val winnerSummary = winningTeam?.let { " $it venceu a partida à melhor de 7." } ?: ""
         return summary + matchSummary + winnerSummary
     }
+
+    internal fun roundWinsForPoints(points: Int): Int = when {
+        points == 120 -> 4
+        points >= 91 -> 2
+        else -> 1
+    }
+}
+
+fun Card.trumpDisplayName(): String {
+    val rankName = when (rank) {
+        Rank.TWO -> "dois"
+        Rank.THREE -> "três"
+        Rank.FOUR -> "quatro"
+        Rank.FIVE -> "cinco"
+        Rank.SIX -> "seis"
+        Rank.QUEEN -> "dama"
+        Rank.JACK -> "valete"
+        Rank.KING -> "rei"
+        Rank.SEVEN -> "sete"
+        Rank.ACE -> "ás"
+    }
+    return "$rankName ${suit.label.lowercase()}"
 }
